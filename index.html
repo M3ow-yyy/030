@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#fdfbfb">
+<title>小手机</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+body {
+  /* 韩系奶油风柔和渐变壁纸 */
+  background: 
+    radial-gradient(circle at 20% 20%, #fff0f5 0%, transparent 50%),
+    radial-gradient(circle at 80% 30%, #e0f7fa 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, #fdf5e6 0%, transparent 60%),
+    linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background-attachment: fixed;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse at 30% 10%, rgba(255,255,255,0.6) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 90%, rgba(255,240,245,0.4) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#phone {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top, 44px) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 0);
+  z-index: 1;
+}
+
+/* 状态栏 */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 28px 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #5a5a66; /* 深灰字，更柔和 */
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-right svg {
+  width: 16px;
+  height: 11px;
+}
+
+/* 桌面主体 */
+.desktop {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px 0;
+  overflow: hidden;
+}
+
+/* 网格区域 */
+.grid-area {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: min-content;
+  gap: 18px 14px;
+  align-content: start;
+  padding-top: 8px;
+}
+
+/* 玻璃拟物化基础类 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 
+    0 10px 30px rgba(0,0,0,0.04),
+    inset 0 1px 0 rgba(255,255,255,0.8);
+}
+
+/* 大组件 4x4 */
+.widget-large {
+  grid-column: span 4;
+  aspect-ratio: 1 / 1;
+  border-radius: 32px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget-large .photo-top,
+.widget-large .photo-bottom {
+  flex: 1;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.widget-large .photo-top {
+  background-image: linear-gradient(135deg, #fdfbfb, #ebedee);
+}
+
+.widget-large .photo-bottom {
+  background-image: linear-gradient(135deg, #f5f7fa, #e4efea);
+  position: relative;
+}
+
+.widget-large .photo-bottom::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.8));
+  pointer-events: none;
+}
+
+.widget-large .center-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 28%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-image: linear-gradient(135deg, #fff1eb, #f8d4d4);
+  border: 4px solid #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.widget-large .signature {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 16%;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b6b78;
+  padding: 0 16px;
+  z-index: 3;
+  outline: none;
+  letter-spacing: 1px;
+}
+
+.widget-large .small-text {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 8%;
+  text-align: center;
+  font-size: 10px;
+  color: #9fa0ab;
+  padding: 0 16px;
+  z-index: 3;
+  outline: none;
+  letter-spacing: 2px;
+}
+
+[contenteditable]:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(150,150,160,0.5);
+}
+
+/* 中等组件 2x2 */
+.widget-medium {
+  grid-column: span 2;
+  grid-row: span 2;
+  aspect-ratio: 1 / 1;
+  border-radius: 26px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 8px;
+}
+
+.pill {
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.pill.reverse {
+  flex-direction: row-reverse;
+}
+
+.pill .avatar {
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-image: linear-gradient(135deg, #e0c3fc, #8ec5fc);
+  border: 2px solid #fff;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.pill .text {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b6b78;
+  outline: none;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pill.reverse .text {
+  text-align: right;
+}
+
+/* 应用图标 */
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.app-icon {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 24%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 6px 16px rgba(0,0,0,0.05),
+    inset 0 1px 0 rgba(255,255,255,1);
+  overflow: hidden;
+  position: relative;
+}
+
+.app-icon svg {
+  width: 48%;
+  height: 48%;
+}
+
+.app-label {
+  font-size: 11px;
+  color: #5a5a66; /* 浅色背景配深色字 */
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.8); /* 白色发光阴影 */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 空行占位 */
+.spacer-row {
+  grid-column: span 4;
+  height: 8px;
+}
+
+/* Dock栏 */
+.dock {
+  margin: 12px 12px 8px;
+  padding: 14px 10px;
+  border-radius: 32px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dock .app-icon {
+  border-radius: 24%;
+}
+
+.dock .app-label {
+  display: none;
+}
+
+/* Home Indicator */
+.home-indicator {
+  width: 134px;
+  height: 5px;
+  background: rgba(0,0,0,0.15); /* 柔和的深色指示条 */
+  border-radius: 3px;
+  margin: 6px auto 0;
+  flex-shrink: 0;
+}
+
+/* 隐藏文件输入 */
+.file-input {
+  display: none;
+}
+
+/* 提示弹出 */
+.toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.8);
+  color: #5a5a66;
+  padding: 12px 24px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.toast.show {
+  opacity: 1;
+}
+</style>
+</head>
+<body>
+<div id="phone">
+  <!-- 状态栏 -->
+  <div class="status-bar">
+    <span id="time">9:41</span>
+    <div class="status-right">
+      <svg viewBox="0 0 18 12" fill="#5a5a66"><path d="M1 8h2v3H1zM5 6h2v5H5zM9 4h2v7H9zM13 1h2v10h-2z"/></svg>
+      <svg viewBox="0 0 16 12" fill="#5a5a66"><path d="M8 2c2.2 0 4.2.8 5.7 2.2l1.4-1.4C13.3 1 10.8 0 8 0S2.7 1 .9 2.8l1.4 1.4C3.8 2.8 5.8 2 8 2zm0 4c1.1 0 2.1.4 2.9 1.2l1.4-1.4C11.1 4.7 9.6 4 8 4s-3.1.7-4.3 1.8l1.4 1.4C5.9 6.4 6.9 6 8 6zm0 4l2.5-2.5C9.8 6.8 8.9 6.5 8 6.5s-1.8.3-2.5.9L8 10z"/></svg>
+      <svg viewBox="0 0 24 12" fill="none" stroke="#5a5a66" stroke-width="1"><rect x="1" y="2" width="19" height="8" rx="2"/><rect x="2.5" y="3.5" width="16" height="5" rx="1" fill="#5a5a66"/><rect x="21" y="4" width="1.5" height="4" rx="0.5" fill="#5a5a66"/></svg>
+    </div>
+  </div>
+
+  <!-- 桌面 -->
+  <div class="desktop">
+    <div class="grid-area">
+      <!-- 大组件：照片墙 -->
+      <div class="widget-large glass-effect">
+        <div class="photo-top" data-photo="top"></div>
+        <div class="photo-bottom" data-photo="bottom"></div>
+        <div class="center-circle" data-photo="center"></div>
+        <div class="signature" contenteditable="true" data-placeholder="个性签名">愿你眼里有星辰</div>
+        <div class="small-text" contenteditable="true" data-placeholder="小字编辑">— 2024 —</div>
+      </div>
+
+      <!-- 中组件 2x2 -->
+      <div class="widget-medium glass-effect">
+        <div class="pill">
+          <div class="avatar" data-photo="pill1"></div>
+          <div class="text" contenteditable="true" data-placeholder="文字">Hello~</div>
+        </div>
+        <div class="pill reverse">
+          <div class="avatar" data-photo="pill2"></div>
+          <div class="text" contenteditable="true" data-placeholder="文字">在线中</div>
+        </div>
+      </div>
+
+      <!-- 四个应用 -->
+      <div class="app">
+        <div class="app-icon">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="msgGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#9ee8b4"/>
+                <stop offset="1" stop-color="#65d483"/>
+              </linearGradient>
+            </defs>
+            <path d="M32 10c-12 0-22 8-22 18 0 5 3 10 8 13l-2 8 9-5c2 1 5 1 7 1 12 0 22-8 22-17S44 10 32 10z" fill="url(#msgGrad)"/>
+            <circle cx="24" cy="28" r="2.5" fill="white"/>
+            <circle cx="32" cy="28" r="2.5" fill="white"/>
+            <circle cx="40" cy="28" r="2.5" fill="white"/>
+          </svg>
+        </div>
+        <div class="app-label">iMessage</div>
+      </div>
+
+      <div class="app">
+        <div class="app-icon">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="20" fill="none" stroke="#ffb3ba" stroke-width="3"/>
+            <path d="M32 18v14l10 6" fill="none" stroke="#ffb3ba" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="32" cy="32" r="3" fill="#ffb3ba"/>
+          </svg>
+        </div>
+        <div class="app-label">Offline</div>
+      </div>
+
+      <div class="app">
+        <div class="app-icon">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 20c0-4 3-7 7-7h18c4 0 7 3 7 7v16c0 4-3 7-7 7H28l-10 8v-8c-1.2 0-2-3-2-7V20z" fill="#bae1ff" stroke="#8ecae6" stroke-width="2"/>
+            <circle cx="26" cy="28" r="2.5" fill="#fff"/>
+            <circle cx="32" cy="28" r="2.5" fill="#fff"/>
+            <circle cx="38" cy="28" r="2.5" fill="#fff"/>
+          </svg>
+        </div>
+        <div class="app-label">Char</div>
+      </div>
+
+      <div class="app">
+        <div class="app-icon">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <rect x="14" y="14" width="36" height="36" rx="8" fill="none" stroke="#e5c1e5" stroke-width="3"/>
+            <path d="M22 24h20M22 32h20M22 40h12" stroke="#e5c1e5" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="44" cy="40" r="3" fill="#e5c1e5"/>
+          </svg>
+        </div>
+        <div class="app-label">预设</div>
+      </div>
+
+      <!-- 空一行 -->
+      <div class="spacer-row"></div>
+    </div>
+  </div>
+
+  <!-- Dock -->
+  <div class="dock glass-effect">
+    <div class="app">
+      <div class="app-icon">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="24" r="10" fill="none" stroke="#ffc8dd" stroke-width="3"/>
+          <path d="M14 52c0-10 8-16 18-16s18 6 18 16" fill="none" stroke="#ffc8dd" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="app-label">联系人</div>
+    </div>
+    <div class="app">
+      <div class="app-icon">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22c0-4 3-7 7-7h26c4 0 7 3 7 7v14c0 4-3 7-7 7H30l-12 9v-9c-3.5 0-6-3-6-7V22z" fill="#b9fbc0" stroke="#95d5b2" stroke-width="2"/>
+          <circle cx="24" cy="29" r="2.5" fill="#fff"/>
+          <circle cx="32" cy="29" r="2.5" fill="#fff"/>
+          <circle cx="40" cy="29" r="2.5" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="app-label">短信</div>
+    </div>
+    <div class="app">
+      <div class="app-icon">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 32L32 12l22 20" fill="none" stroke="#e2cda9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16 30v20h32V30" fill="none" stroke="#e2cda9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="27" y="38" width="10" height="12" fill="none" stroke="#e2cda9" stroke-width="3" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="app-label">家</div>
+    </div>
+    <div class="app">
+      <div class="app-icon">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="18" fill="none" stroke="#c5c6c7" stroke-width="3"/>
+          <circle cx="32" cy="32" r="6" fill="none" stroke="#c5c6c7" stroke-width="3"/>
+          <g stroke="#c5c6c7" stroke-width="3" stroke-linecap="round">
+            <line x1="32" y1="10" x2="32" y2="16"/>
+            <line x1="32" y1="48" x2="32" y2="54"/>
+            <line x1="10" y1="32" x2="16" y2="32"/>
+            <line x1="48" y1="32" x2="54" y2="32"/>
+            <line x1="17" y1="17" x2="21" y2="21"/>
+            <line x1="43" y1="43" x2="47" y2="47"/>
+            <line x1="47" y1="17" x2="43" y2="21"/>
+            <line x1="21" y1="43" x2="17" y2="47"/>
+          </g>
+        </svg>
+      </div>
+      <div class="app-label">设置</div>
+    </div>
+  </div>
+
+  <div class="home-indicator"></div>
+</div>
+
+<input type="file" class="file-input" id="fileInput" accept="image/*">
+<div class="toast" id="toast">已更新</div>
+
+<script>
+// 更新时间
+function updateTime() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2, '0');
+  const m = now.getMinutes().toString().padStart(2, '0');
+  document.getElementById('time').textContent = `${h}:${m}`;
+}
+updateTime();
+setInterval(updateTime, 30000);
+
+// 图片更换
+const fileInput = document.getElementById('fileInput');
+let currentTarget = null;
+
+document.querySelectorAll('[data-photo]').forEach(el => {
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    currentTarget = el;
+    fileInput.click();
+  });
+});
+
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file || !currentTarget) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentTarget.style.backgroundImage = `url(${ev.target.result})`;
+    // 保存到 localStorage
+    const key = currentTarget.dataset.photo;
+    try {
+      localStorage.setItem('photo_' + key, ev.target.result);
+    } catch(err) {}
+    showToast('图片已更新');
+  };
+  reader.readAsDataURL(file);
+  fileInput.value = '';
+});
+
+// 加载保存的图片
+document.querySelectorAll('[data-photo]').forEach(el => {
+  const key = el.dataset.photo;
+  const saved = localStorage.getItem('photo_' + key);
+  if (saved) el.style.backgroundImage = `url(${saved})`;
+});
+
+// 文本编辑保存
+document.querySelectorAll('[contenteditable]').forEach((el, i) => {
+  const key = 'text_' + i;
+  const saved = localStorage.getItem(key);
+  if (saved !== null) el.textContent = saved;
+  el.addEventListener('blur', () => {
+    localStorage.setItem(key, el.textContent);
+  });
+});
+
+// Toast
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1500);
+}
+
+// 阻止双击缩放
+let lastTouch = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouch < 300) e.preventDefault();
+  lastTouch = now;
+}, { passive: false });
+</script>
+</body>
+</html>
