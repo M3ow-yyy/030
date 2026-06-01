@@ -1,4 +1,3 @@
-```javascript
 const CACHE_NAME = 'tutu-phone-cache-v1';
 
 // 这里填入你希望用户在离线时也能访问的核心文件
@@ -67,4 +66,3 @@ self.addEventListener('activate', event => {
         })
     );
 });
-```
