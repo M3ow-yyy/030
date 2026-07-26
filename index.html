@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>爱兔叽 OS</title>
+    <style>
+        /* 基础重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        html { height: -webkit-fill-available; }
+        body { background-color: #000; display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; height: -webkit-fill-available; overflow: hidden; color: #fff; }
+
+        /* 手机系统容器 */
+        #os-container {
+            width: 100vw; height: 100%;
+            background: linear-gradient(135deg, #2a2d34 0%, #4a5058 40%, #1a1c21 100%);
+            position: relative; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* 编辑模式顶部操作栏 (默认隐藏) */
+        .edit-header {
+            position: absolute; top: calc(35px + env(safe-area-inset-top)); left: 0; right: 0; padding: 0 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 60;
+        }
+        body.edit-mode .edit-header { opacity: 1; pointer-events: auto; }
+        .btn-glass {
+            background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border-radius: 12px;
+            padding: 6px 14px; font-size: 14px; font-weight: 600; color: #fff; border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
+        }
+        .btn-glass:active { background: rgba(255,255,255,0.3); }
+
+        /* 桌面横向轮播区域 */
+        .desktop-carousel {
+            flex: 1; display: flex; overflow-x: auto; overflow-y: hidden;
+            scroll-snap-type: x mandatory; scrollbar-width: none; -ms-overflow-style: none;
+            padding-bottom: 120px; /* 为dock栏留出空间 */
+        }
+        .desktop-carousel::-webkit-scrollbar { display: none; }
+        
+        .desktop-page {
+            min-width: 100vw; height: 100%; scroll-snap-align: start;
+            padding: calc(35px + env(safe-area-inset-top)) 20px 10px; display: flex; flex-direction: column; overflow-y: auto;
+        }
+
+        /* 翻页指示器 */
+        .page-dots {
+            position: absolute; bottom: calc(125px + env(safe-area-inset-bottom)); left: 0; right: 0;
+            display: flex; justify-content: center; gap: 8px; z-index: 10;
+        }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: 0.3s; }
+        .dot.active { background: #fff; }
+
+        /* ======== 核心：液态玻璃质感 ======== */
+        .glass {
+            background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* 第 1 页组件布局 */
+        .large-widget { width: 100%; aspect-ratio: 1/1.15; border-radius: 36px; position: relative; overflow: hidden; margin-bottom: 30px; }
+        .img-upload { background-color: rgba(255,255,255,0.1); background-size: cover; background-position: center; position: absolute; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .img-1 { left: 16px; top: 16px; width: calc(55% - 16px); height: 48%; border-radius: 20px; }
+        .img-2 { right: 16px; top: 40px; width: 25%; aspect-ratio: 1; border-radius: 12px; }
+        .img-3 { right: 16px; bottom: 16px; width: calc(45% - 24px); height: 55%; border-radius: 20px; }
+        .text-edit { position: absolute; z-index: 5; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        .text-title { left: 20px; top: 54%; font-size: 26px; font-weight: 800; }
+        .text-desc { left: 20px; top: 67%; width: 48%; font-size: 13px; font-weight: 600; line-height: 1.4; color: rgba(255,255,255,0.9); }
+        .text-footer { left: 20px; bottom: 22px; font-size: 13px; font-weight: 600; }
+        .decor-label { top: 20px; right: 45%; background: #000; padding: 4px 10px; font-size: 11px; border-radius: 4px; }
+
+        .row-2 { display: grid; grid-template-columns: 1fr 1.15fr; gap: 18px; margin-top: -10px; align-items: center; }
+        .music-widget { aspect-ratio: 1; border-radius: 30px; position: relative; padding: 16px; overflow: hidden; display: flex; flex-direction: column; }
+        .music-title { font-size: 18px; font-weight: 800; top: 15px; left: 16px; }
+        .music-sub { position: absolute; top: 40px; left: 16px; font-size: 10px; color: rgba(255,255,255,0.65); font-weight: 600; }
+        .vinyl-disk { position: absolute; left: 58px; bottom: 8px; width: 92px; height: 92px; border-radius: 50%; background: repeating-radial-gradient(circle, #222 0px, #222 1px, #080808 2px, #080808 3px); box-shadow: 0 6px 18px rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; animation: spinCD 15s linear infinite; z-index: 1; }
+        .vinyl-center { width: 30px; height: 30px; background: rgba(0, 0, 0, 0.8); border-radius: 50%; border: 5px solid rgba(255,255,255,0.25); }
+        @keyframes spinCD { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .music-cover-wrapper { position: absolute; left: 12px; bottom: 8px; width: 86px; height: 86px; background-color: #fff; background-size: cover; background-position: center; border-radius: 8px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 4px 8px 18px rgba(0,0,0,0.6); z-index: 2; transform: rotate(-5deg); }
+
+        /* 纯 App 网格布局 (第2/3页) */
+        .apps-full-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: max-content; gap: 20px 10px; padding-top: 10px; align-content: start;
+        }
+
+        .apps-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 16px 12px; }
+        
+        .app-item {
+            display: flex; flex-direction: column; align-items: center; gap: 5px; position: relative;
+            cursor: pointer; user-select: none;
+        }
+        /* 拖拽反馈 */
+        .app-item.dragging, .large-widget.dragging, .row-2.dragging { opacity: 0.3; }
+        .sortable-fallback { 
+            opacity: 0.95 !important; 
+            transform: scale(1.05) !important; 
+            z-index: 9999 !important; 
+            cursor: grabbing !important; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important;
+            border-radius: inherit;
+        }
+
+        .app-icon {
+            width: 58px; height: 58px; border-radius: 17px; background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(16px); box-shadow: inset 0 0 1px rgba(255,255,255,0.6), 0 6px 15px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.25); position: relative; display: flex; justify-content: center; align-items: center;
+        }
+        .app-icon::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 45%); border-radius: 17px; pointer-events: none; }
+        .app-icon svg { z-index: 2; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
+        .app-name { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.9); text-shadow: 0 1.5px 3px rgba(0,0,0,0.8); }
+
+        /* 搜索框 mock */
+        .search-bar-mock { position: absolute; bottom: calc(140px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); padding: 5px 14px; border-radius: 14px; font-size: 11px; display: flex; align-items: center; gap: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); cursor: pointer; z-index: 10; transition: opacity 0.3s; }
+        body.edit-mode .search-bar-mock { opacity: 0; pointer-events: none; }
+
+        /* Dock栏 */
+        .dock-container { position: absolute; bottom: calc(24px + env(safe-area-inset-bottom)); left: 20px; right: 20px; height: 90px; border-radius: 32px; display: flex; justify-content: space-around; align-items: center; padding: 0 12px; z-index: 10; }
+        .dock-icon { width: 60px; height: 60px; border-radius: 18px; background: rgba(255,255,255,0.15); backdrop-filter: blur(16px); display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 1px rgba(255,255,255,0.6), 0 4px 15px rgba(0,0,0,0.25); border: 1px solid rgba(255, 255, 255, 0.25); position: relative; }
+        .dock-icon::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 45%); border-radius: 18px; pointer-events: none; }
+        
+        /* 文件夹合并动画 */
+        .merge-target { transform: scale(1.15) !important; box-shadow: 0 0 25px rgba(255,255,255,0.7); border-radius: 17px; transition: 0.2s; z-index: 100; }
+        
+        /* 文件夹样式 */
+        .folder-icon { background: rgba(255,255,255,0.25); display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2px; width: 44px; height: 44px; padding: 2px; }
+        .mini-icon { width: 100%; height: 100%; border-radius: 4px; display:flex; justify-content:center; align-items:center; background-size: cover; }
+        .mini-icon svg { width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); stroke-width: 2.5; }
+
+        /* 文件夹展开浮层 */
+        .folder-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            z-index: 90; display: none; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .folder-overlay.show { opacity: 1; }
+        .folder-view {
+            width: 85%; max-width: 350px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(30px); 
+            border-radius: 36px; padding: 30px 20px; display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);
+        }
+        .folder-name-input {
+            background: transparent; border: none; color: #fff; font-size: 26px; font-weight: bold;
+            text-align: center; margin-bottom: 25px; outline: none; width: 100%; text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .folder-grid {
+            width: 100%; min-height: 120px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px 15px;
+        }
+
+        /* 编辑模式 Jiggle 抖动动画 */
+        @keyframes jiggle { 0% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } 100% { transform: rotate(-2deg); } }
+        body.edit-mode .app-item, body.edit-mode .large-widget, body.edit-mode .music-widget {
+            animation: jiggle 0.25s infinite;
+        }
+        body.edit-mode .app-item:nth-child(even) { animation-direction: reverse; animation-duration: 0.27s; }
+        /* 删除徽章 */
+        .delete-badge { position: absolute; top: -6px; left: -6px; width: 22px; height: 22px; background: rgba(255,255,255,0.6); backdrop-filter: blur(5px); border-radius: 50%; display: none; justify-content: center; align-items: center; z-index: 10; color: #333; font-weight: bold; font-size: 14px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
+        body.edit-mode .app-item .delete-badge { display: flex; }
+
+        /* 搜索页面 */
+        .search-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(25px); z-index: 150; display: flex; flex-direction: column; padding: 50px 20px 20px; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        
+        /* 设置页面 */
+        .settings-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #2a2d34 0%, #4a5058 40%, #1a1c21 100%); z-index: 150; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.3s; overflow-y: auto; padding-bottom: 30px; scrollbar-width: none; }
+        .settings-overlay::-webkit-scrollbar { display: none; }
+        .settings-overlay.show { opacity: 1; pointer-events: auto; }
+        .settings-header-top { display: flex; align-items: center; justify-content: space-between; padding: 50px 20px 20px; position: sticky; top: 0; z-index: 10; backdrop-filter: blur(20px); background: rgba(0,0,0,0.1); }
+        .settings-title { font-size: 28px; font-weight: bold; }
+        .settings-content { padding: 0 20px; display: flex; flex-direction: column; gap: 20px; margin-top: 10px; }
+        .settings-card { background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .settings-list { background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); border-radius: 20px; overflow: hidden; }
+        .settings-item { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+        .settings-item:last-child { border-bottom: none; }
+        .settings-item:active { background: rgba(255,255,255,0.15); }
+        .settings-item-title { font-size: 16px; font-weight: 500; }
+        .settings-item-icon { color: rgba(255,255,255,0.5); font-size: 20px; }
+        
+        .account-info { display: flex; align-items: center; gap: 16px; }
+        .account-avatar { width: 64px; height: 64px; border-radius: 50%; background: #ccc; background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; }
+        .account-details { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .account-name { font-size: 20px; font-weight: 600; }
+        .account-id { font-size: 13px; color: rgba(255,255,255,0.7); }
+        .account-mask { font-size: 12px; display: inline-block; padding: 3px 10px; background: rgba(255,255,255,0.15); border-radius: 12px; width: max-content; margin-top: 2px; }
+        .search-overlay.show { opacity: 1; pointer-events: auto; }
+        .search-header { display: flex; align-items: center; gap: 14px; margin-bottom: 35px; }
+        .search-input-box { flex: 1; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+        .search-input-box input { background: transparent; border: none; outline: none; color: #fff; width: 100%; font-size: 15px; }
+        .search-results-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px 10px; }
+        
+        input[type="file"] { display: none; }
+
+        /* 折叠面板 (手风琴) */
+        .accordion-item {
+            background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            border-radius: 20px; overflow: hidden; margin-bottom: 15px; transition: all 0.3s ease;
+        }
+        .accordion-header {
+            padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; font-size: 16px; font-weight: 500;
+        }
+        .accordion-header:active { background: rgba(255,255,255,0.15); }
+        .accordion-icon { transition: transform 0.3s; color: rgba(255,255,255,0.5); font-size: 20px; }
+        .accordion-item.expanded .accordion-icon { transform: rotate(90deg); }
+        .accordion-content {
+            max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; padding: 0 20px;
+        }
+        .accordion-item.expanded .accordion-content {
+            max-height: 800px; padding: 10px 20px 20px; border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* 表单元素 */
+        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        
+        /* 拍立得样式 (带3D翻转) */
+        .polaroid-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 10px 0; }
+        .polaroid-card {
+            background: transparent; perspective: 1000px; aspect-ratio: 1 / 1.25;
+            cursor: pointer; transform: rotate(-2deg); transition: transform 0.3s; color: #000;
+        }
+        .polaroid-card:nth-child(even) { transform: rotate(2deg); }
+        .polaroid-inner {
+            position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d;
+            border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .polaroid-card.flipped .polaroid-inner { transform: rotateY(180deg); }
+        .polaroid-front, .polaroid-back {
+            position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: #fff;
+            border-radius: 8px; box-sizing: border-box;
+        }
+        .polaroid-front { padding: 10px 10px 30px 10px; display: flex; flex-direction: column; align-items: center; }
+        .polaroid-back { transform: rotateY(180deg); padding: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .polaroid-img { width: 100%; aspect-ratio: 1; background-color: #eee; background-size: cover; background-position: center; border-radius: 4px; }
+        .polaroid-name { font-family: 'Courier New', Courier, monospace; font-weight: bold; margin-top: 10px; font-size: 14px; text-align: center; width: 100%; word-break: break-all; }
+        .polaroid-back-name { font-size: 18px; font-weight: bold; margin-bottom: 8px; text-align: center; }
+        .polaroid-back-phone { font-size: 12px; color: #666; text-align: center; }
+        .polaroid-actions { position: absolute; bottom: 12px; right: 12px; display: flex; justify-content: flex-end; }
+        .polaroid-icon-btn { 
+            background: rgba(0,0,0,0.06); border-radius: 50%; width: 34px; height: 34px; 
+            display: flex; justify-content: center; align-items: center; transition: background 0.2s;
+        }
+        .polaroid-icon-btn:active { background: rgba(0,0,0,0.15); }
+        .polaroid-icon-btn svg { width: 18px; height: 18px; stroke: #333; }
+
+        /* 放大预览样式加强 */
+        #photo-preview-overlay { 
+            position: absolute; top:0; left:0; width:100%; height:100%; 
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); 
+            z-index: 300; display:none; justify-content:center; align-items:center; 
+            flex-direction:column; 
+        }
+        .zoomed-polaroid-container {
+            width: 80%; max-width: 320px; aspect-ratio: 1 / 1.25; perspective: 1000px;
+        }
+        .zoomed-polaroid-container.flipped .polaroid-inner { transform: rotateY(180deg); }
+        .zoom-controls {
+            margin-top: 30px; display: flex; gap: 40px;
+        }
+        .zoom-btn {
+            width: 54px; height: 54px; border-radius: 50%; background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3); display: flex; justify-content: center; align-items: center;
+            cursor: pointer; transition: 0.2s;
+        }
+        .zoom-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.3); }
+        .zoom-btn svg { width: 24px; height: 24px; stroke: #fff; fill: none; stroke-width: 2; }
+        
+        /* 批量管理时的复选框 */
+        .mask-checkbox { position: absolute; top: -10px; left: -10px; z-index: 10; display: none; width: 24px; height: 24px; transform: scale(1.5); }
+        .manage-mode .mask-checkbox { display: block; }
+        
+        .font-list-item { display: flex; justify-content: space-between; background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; margin-bottom: 5px; align-items: center; font-size: 13px; }
+        
+        /* 开关组件 */
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.2); transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #4cd964; }
+        input:checked + .slider:before { transform: translateX(18px); }
+        .form-group label { font-size: 13px; color: rgba(255,255,255,0.8); }
+        .form-input, .form-select {
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 12px;
+            padding: 10px 14px; color: #fff; font-size: 14px; outline: none; width: 100%;
+        }
+        .form-select {
+            appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 14px center; background-size: 14px; padding-right: 35px;
+        }
+        .form-select option { color: #000; }
+        .form-row { display: flex; gap: 10px; }
+        .btn-primary { background: rgba(255,255,255,0.9); color: #000; border: none; padding: 10px 14px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; font-size: 14px; }
+        .btn-primary:active { background: rgba(255,255,255,0.7); }
+        .btn-secondary { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 10px 14px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; font-size: 14px; }
+        .btn-secondary:active { background: rgba(255,255,255,0.3); }
+    </style>
+    <!-- 引入强大的拖拽引擎实现丝滑跨区拖拽与自动补位 -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+</head>
+<body>
+
+    <div id="os-container">
+        <!-- 编辑模式顶部栏 -->
+        <div class="edit-header">
+            <div class="btn-glass" onclick="alert('添加组件面板即将上线！')">+</div>
+            <div class="btn-glass" onclick="toggleEditMode(false)">完成</div>
+        </div>
+
+        <!-- 桌面轮播区 -->
+        <div class="desktop-carousel" id="desktop-carousel">
+            
+            <!-- 第 1 页 -->
+            <div class="desktop-page sortable-list" data-group="widgets">
+                <div class="large-widget glass">
+                    <div class="text-edit decor-label" onclick="editString('decor-text')"><span id="decor-text">Лотос</span></div>
+                    <div class="img-upload img-1" onclick="triggerUpload('input-img-1')" id="preview-1"></div>
+                    <div class="img-upload img-2" onclick="triggerUpload('input-img-2')" id="preview-2"></div>
+                    <div class="img-upload img-3" onclick="triggerUpload('input-img-3')" id="preview-3"></div>
+                    <div class="text-edit text-title" onclick="editString('title-text')"><span id="title-text">Lótus</span></div>
+                    <div class="text-edit text-desc" onclick="editString('desc-text')"><span id="desc-text">You just had alight smile...</span></div>
+                    <div class="text-edit text-footer" onclick="editString('footer-text')"><span id="footer-text">Die Hitze</span></div>
+                    <input type="file" id="input-img-1" accept="image/*" onchange="loadImage(event, 'preview-1')">
+                    <input type="file" id="input-img-2" accept="image/*" onchange="loadImage(event, 'preview-2')">
+                    <input type="file" id="input-img-3" accept="image/*" onchange="loadImage(event, 'preview-3')">
+                </div>
+
+                <div class="row-2">
+                    <div class="music-widget glass">
+                        <div class="text-edit music-title" onclick="editString('music-title-text')"><span id="music-title-text">Music Time</span></div>
+                        <div class="music-sub">▶ ·ııllııılllıı_ıı· 0:10</div>
+                        <div class="vinyl-disk"><div class="vinyl-center"></div></div>
+                        <div class="music-cover-wrapper" id="music-cover-preview" onclick="triggerUpload('input-music-cover')"></div>
+                        <input type="file" id="input-music-cover" accept="image/*" onchange="loadImage(event, 'music-cover-preview')">
+                    </div>
+
+                    <div class="apps-grid sortable-list">
+                        <div class="app-item" draggable="true">
+                            <div class="delete-badge">-</div>
+                            <div class="app-icon">
+                                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M 7 8 C 8 4 16 4 17 8"></path><path d="M 6.5 9 C 6 13 9 14.5 12 14.5"></path><path d="M 12 14.5 C 15 14.5 18 13 17.5 9"></path>
+                                    <path d="M 7 7.5 C 2 9 1 18 3.5 20 C 5.5 21.5 7.5 15 7.5 11"></path><path d="M 17 7.5 C 22 9 23 18 20.5 20 C 18.5 21.5 16.5 15 16.5 11"></path>
+                                    <path d="M 7.5 10.5 Q 9 9.5 10 10.5"></path><path d="M 14 10.5 Q 15 9.5 16.5 10.5"></path><path d="M 11.5 11.5 Q 12 12.2 12.5 11.5"></path>
+                                    <path d="M 10 15 Q 11.5 12.5 12 13.5 Q 12.5 12.5 14 15"></path><path d="M 9.5 15.5 C 8 17 8 19 9 19.5"></path>
+                                    <path d="M 13.5 15 C 14.5 16 15 17 15 17"></path><path d="M 15 17 C 17 16 17.5 18 16 18.5 C 17 19.5 16 20.5 14.5 19.5"></path>
+                                </svg>
+                            </div>
+                            <span class="app-name">ChatsApp</span>
+                        </div>
+                        <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="2" y1="2" x2="22" y2="22"></line><path d="M8.5 16.5a5 5 0 0 1 7 0"></path><path d="M5 13a10 10 0 0 1 14 0"></path><path d="M1.5 9.5a15 15 0 0 1 21 0"></path></svg></div><span class="app-name">OFFLine</span></div>
+                        <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="7"></circle><path d="M22 12c0-3.3-4.5-6-10-6S2 8.7 2 12s4.5 6 10 6 10-2.7 10-6z" transform="rotate(-30 12 12)"></path></svg></div><span class="app-name">030</span></div>
+                        <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line></svg></div><span class="app-name">预设</span></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 第 2 页 -->
+            <div class="desktop-page">
+                <div class="apps-full-grid sortable-list">
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></div><span class="app-name">日记本</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></div><span class="app-name">备忘录</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="22"></line><line x1="15" y1="22" x2="15" y2="22"></line></svg></div><span class="app-name">iCity</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div><span class="app-name">iMusic</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></div><span class="app-name">iBubble</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div><span class="app-name">提问箱</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div><span class="app-name">商城</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></div><span class="app-name">书屋</span></div>
+                </div>
+            </div>
+
+            <!-- 第 3 页 -->
+            <div class="desktop-page">
+                <div class="apps-full-grid sortable-list">
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></div><span class="app-name">TaPhone</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div><span class="app-name">iSoull</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div><span class="app-name">iXxx</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div><span class="app-name">U&I</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><circle cx="16" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle></svg></div><span class="app-name">iGame</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path></svg></div><span class="app-name">iPet</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><polygon points="12 2 2 22 22 22"></polygon></svg></div><span class="app-name">iAppStore</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div><span class="app-name">iPhoto</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></div><span class="app-name">i-Screen</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="9" y1="12" x2="15" y2="12"></line></svg></div><span class="app-name">iCost</span></div>
+                    <div class="app-item" draggable="true"><div class="delete-badge">-</div><div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="8"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg></div><span class="app-name">iTuTOoto</span></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 全局悬浮搜索框 -->
+        <div class="search-bar-mock" onclick="openSearch()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>搜索</span>
+        </div>
+
+        <div class="page-dots" id="page-dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+
+        <!-- 文件夹展开层 -->
+        <div id="folder-overlay" class="folder-overlay" onclick="if(event.target===this) closeFolder()">
+            <div class="folder-view">
+                <input type="text" class="folder-name-input">
+                <div class="folder-grid sortable-list" id="folder-grid"></div>
+            </div>
+        </div>
+
+        <!-- 底部 Dock 栏 -->
+        <div class="dock-container glass sortable-list">
+            <!-- 给 dock 图标也加上 app-item 类和隐藏名字，方便统一拖拽与搜索 -->
+            <div class="app-item dock-item" draggable="true" data-name="联系人">
+                <div class="delete-badge">-</div>
+                <div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
+                <span class="app-name" style="display:none">联系人</span>
+            </div>
+            <div class="app-item dock-item" draggable="true" data-name="电话">
+                <div class="delete-badge">-</div>
+                <div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
+                <span class="app-name" style="display:none">电话</span>
+            </div>
+            <div class="app-item dock-item" draggable="true" data-name="家">
+                <div class="delete-badge">-</div>
+                <div class="app-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
+                <span class="app-name" style="display:none">家</span>
+            </div>
+            <div class="app-item dock-item" draggable="true" data-name="设置" onclick="openSettings()">
+                <div class="delete-badge">-</div>
+                <div class="app-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
+                <span class="app-name" style="display:none">设置</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜索页面 -->
+    <div id="search-overlay" class="search-overlay">
+        <div class="search-header">
+            <div class="search-input-box">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="app-search-input" placeholder="搜索 App..." oninput="filterApps()">
+            </div>
+            <div class="cancel-btn" onclick="closeSearch()">取消</div>
+        </div>
+        <div class="search-results-grid" id="search-results-container">
+            <div class="no-result" id="no-search-result" style="grid-column: 1/-1; text-align: center; color: rgba(255,255,255,0.6); display: none;">未找到相关应用</div>
+        </div>
+    </div>
+
+    <!-- 设置页面 -->
+    <div id="settings-overlay" class="settings-overlay">
+        <div class="settings-header-top">
+            <div class="settings-title">设置</div>
+            <div class="btn-glass" onclick="closeSettings()" style="padding: 6px 14px;">返回</div>
+        </div>
+        <div class="settings-content">
+            <!-- 1. 个人账号 -->
+            <div class="settings-card" onclick="openAccountSettings()" style="cursor:pointer;">
+                <div class="account-info">
+                    <div class="account-avatar" style="background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><rect width=\'24\' height=\'24\' fill=\'%23fff\'/><path fill=\'%23ccc\' d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>');" id="main-avatar-preview"></div>
+                    <div class="account-details">
+                        <div class="account-name">用户001</div>
+                        <div class="account-id">ID: 10086</div>
+                        <div class="account-mask">选择的面具: 默认</div>
+                    </div>
+                    <div class="settings-item-icon">›</div>
+                </div>
+            </div>
+
+            <div class="settings-list">
+                <!-- 2. API设置 -->
+                <div class="settings-item" onclick="openApiSettings()"><span class="settings-item-title">API设置</span><span class="settings-item-icon">›</span></div>
+                <!-- 3. 美化设置 -->
+                <div class="settings-item" onclick="openBeautySettings()"><span class="settings-item-title">美化设置</span><span class="settings-item-icon">›</span></div>
+                <!-- 4. 其他设置 -->
+                <div class="settings-item"><span class="settings-item-title">其他设置</span><span class="settings-item-icon">›</span></div>
+            </div>
+
+            <div class="settings-list">
+                <!-- 5. 导入档案数据 -->
+                <div class="settings-item" onclick="document.getElementById('input-import-archive').click()"><span class="settings-item-title">导入档案数据</span><span class="settings-item-icon">›</span></div>
+                <!-- 6. 导出档案数据 -->
+                <div class="settings-item" onclick="exportData('archive')"><span class="settings-item-title">导出档案数据</span><span class="settings-item-icon">›</span></div>
+                <!-- 7. 导入美化数据 -->
+                <div class="settings-item" onclick="document.getElementById('input-import-beauty').click()"><span class="settings-item-title">导入美化数据</span><span class="settings-item-icon">›</span></div>
+                <!-- 8. 导出美化数据 -->
+                <div class="settings-item" onclick="exportData('beauty')"><span class="settings-item-title">导出美化数据</span><span class="settings-item-icon">›</span></div>
+                
+                <!-- 隐藏的导入文件输入框 -->
+                <input type="file" id="input-import-archive" accept=".json" style="display:none" onchange="importData(event, 'archive')">
+                <input type="file" id="input-import-beauty" accept=".json" style="display:none" onchange="importData(event, 'beauty')">
+            </div>
+
+            <div class="settings-list">
+                <!-- 9. 检查更新 -->
+                <div class="settings-item"><span class="settings-item-title">检查更新</span><span class="settings-item-icon">›</span></div>
+                <!-- 10. 免责声明 -->
+                <div class="settings-item"><span class="settings-item-title">免责声明</span><span class="settings-item-icon">›</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API设置页面 -->
+    <div id="api-settings-overlay" class="settings-overlay">
+        <div class="settings-header-top">
+            <div class="settings-title">API设置</div>
+            <div class="btn-glass" onclick="closeApiSettings()" style="padding: 6px 14px;">返回</div>
+        </div>
+        <div class="settings-content">
+            
+            <!-- 主API配置 -->
+            <div class="accordion-item" id="main-api-acc">
+                <div class="accordion-header" onclick="toggleAccordion('main-api-acc')"><span>主API配置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label>选择预设</label>
+                        <select class="form-select" id="main-api-preset">
+                            <option value="">-- 选择预设 --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>URL</label>
+                        <input type="text" class="form-input" id="main-api-url" placeholder="https://api.openai.com/v1">
+                    </div>
+                    <div class="form-group">
+                        <label>API KEY</label>
+                        <input type="password" class="form-input" id="main-api-key" placeholder="sk-...">
+                    </div>
+                    <div class="form-group">
+                        <div class="btn-secondary" onclick="alert('拉取模型列表功能即将上线！')">获取模型列表</div>
+                    </div>
+                    <div class="form-group">
+                        <label>选择模型</label>
+                        <select class="form-select" id="main-api-model">
+                            <option value="">-- 请先获取模型 --</option>
+                            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                            <option value="gpt-4o">gpt-4o</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>预设名称 (可选)</label>
+                        <input type="text" class="form-input" id="main-api-preset-name" placeholder="例如：我的默认配置">
+                    </div>
+                    <div class="form-row">
+                        <div class="btn-primary" style="flex:1" onclick="alert('保存预设成功！')">保存预设</div>
+                        <div class="btn-secondary" style="flex:1" onclick="alert('已删除该预设')">删除预设</div>
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
+                        <div class="btn-primary" style="flex:1" onclick="alert('模型保存成功！')">保存模型</div>
+                        <div class="btn-secondary" style="flex:1" onclick="alert('模型已删除')">删除模型</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 副API配置 -->
+            <div class="accordion-item" id="sub-api-acc">
+                <div class="accordion-header" onclick="toggleAccordion('sub-api-acc')"><span>副API配置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label>选择预设</label>
+                        <select class="form-select" id="sub-api-preset">
+                            <option value="">-- 选择预设 --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>URL</label>
+                        <input type="text" class="form-input" id="sub-api-url" placeholder="https://api.openai.com/v1">
+                    </div>
+                    <div class="form-group">
+                        <label>API KEY</label>
+                        <input type="password" class="form-input" id="sub-api-key" placeholder="sk-...">
+                    </div>
+                    <div class="form-group">
+                        <div class="btn-secondary" onclick="alert('拉取模型列表功能即将上线！')">获取模型列表</div>
+                    </div>
+                    <div class="form-group">
+                        <label>选择模型</label>
+                        <select class="form-select" id="sub-api-model">
+                            <option value="">-- 请先获取模型 --</option>
+                            <option value="claude-3-haiku">claude-3-haiku</option>
+                            <option value="claude-3.5-sonnet">claude-3.5-sonnet</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>预设名称 (可选)</label>
+                        <input type="text" class="form-input" id="sub-api-preset-name" placeholder="例如：备用通道">
+                    </div>
+                    <div class="form-row">
+                        <div class="btn-primary" style="flex:1" onclick="alert('保存预设成功！')">保存预设</div>
+                        <div class="btn-secondary" style="flex:1" onclick="alert('已删除该预设')">删除预设</div>
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
+                        <div class="btn-primary" style="flex:1" onclick="alert('模型保存成功！')">保存模型</div>
+                        <div class="btn-secondary" style="flex:1" onclick="alert('模型已删除')">删除模型</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 生图配置 -->
+            <div class="accordion-item" id="img-api-acc">
+                <div class="accordion-header" onclick="toggleAccordion('img-api-acc')"><span>生图配置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <p style="font-size:13px; color:rgba(255,255,255,0.7); padding-bottom:10px;">生图配置项即将上线，敬请期待。</p>
+                </div>
+            </div>
+
+            <!-- 语音配置 -->
+            <div class="accordion-item" id="voice-api-acc">
+                <div class="accordion-header" onclick="toggleAccordion('voice-api-acc')"><span>语音配置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <p style="font-size:13px; color:rgba(255,255,255,0.7); padding-bottom:10px;">语音识别/合成配置项即将上线，敬请期待。</p>
+                </div>
+            </div>
+
+            <!-- 识图配置 -->
+            <div class="accordion-item" id="vision-api-acc">
+                <div class="accordion-header" onclick="toggleAccordion('vision-api-acc')"><span>识图配置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <p style="font-size:13px; color:rgba(255,255,255,0.7); padding-bottom:10px;">视觉分析模型配置项即将上线，敬请期待。</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 美化设置页面 -->
+    <div id="beauty-settings-overlay" class="settings-overlay">
+        <div class="settings-header-top">
+            <div class="settings-title">美化设置</div>
+            <div class="btn-glass" onclick="closeBeautySettings()" style="padding: 6px 14px;">返回</div>
+        </div>
+        <div class="settings-content">
+            
+            <!-- 桌面壁纸设置 -->
+            <div class="accordion-item" id="wallpaper-acc">
+                <div class="accordion-header" onclick="toggleAccordion('wallpaper-acc')"><span>桌面壁纸设置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label>自定义桌面壁纸</label>
+                        <input type="file" id="input-wallpaper" accept="image/*" onchange="changeWallpaper(event)" style="display:none">
+                        <div class="btn-secondary" onclick="document.getElementById('input-wallpaper').click()">选择壁纸图片</div>
+                    </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <div class="btn-primary" onclick="restoreWallpaper()">恢复默认壁纸</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- App图标与名称设置 -->
+            <div class="accordion-item" id="app-beauty-acc">
+                <div class="accordion-header" onclick="toggleAccordion('app-beauty-acc')"><span>App 图标与名称设置</span><span class="accordion-icon">›</span></div>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label>选择要修改的 App</label>
+                        <select class="form-select" id="beauty-app-select">
+                            <option value="">-- 请选择 --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>新名称</label>
+                        <input type="text" class="form-input" id="beauty-app-name" placeholder="输入新的 App 名称">
+                    </div>
+                    <div class="form-group">
+                        <label>新图标</label>
+                        <input type="file" id="input-app-icon" accept="image/*" style="display:none" onchange="previewAppIcon(event)">
+                        <div class="btn-secondary" id="btn-app-icon-upload" onclick="document.getElementById('input-app-icon').click()">选择新图标图片</div>
+                        <div id="beauty-icon-preview" style="width: 58px; height: 58px; border-radius: 17px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); display: none; margin-top: 5px; background-size: cover; background-position: center;"></div>
+                    </div>
+                    <div class="form-row" style="margin-top:15px;">
+                        <div class="btn-primary" style="flex:1" onclick="saveAppBeauty()">保存修改</div>
+                        <div class="btn-secondary" style="flex:1" onclick="restoreAppBeauty()">恢复默认</div>
+                    </div>
+                    <div class="form-row" style="margin-top:10px;">
+                        <div class="btn-secondary" style="flex:1; background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.15); color:rgba(255,255,255,0.8);" onclick="restoreAllAppBeauty()">全部 App 恢复默认</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 个人账号设置页面 -->
+    <div id="account-settings-overlay" class="settings-overlay">
+        <div class="settings-header-top">
+            <div class="settings-title">个人账号</div>
+            <div class="btn-glass" onclick="closeAccountSettings()" style="padding: 6px 14px;">返回</div>
+        </div>
+        <div class="settings-content">
+            <div class="settings-card" style="align-items: center; padding: 30px 20px;">
+                <div class="account-avatar" style="width: 80px; height: 80px; margin-bottom: 10px; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><rect width=\'24\' height=\'24\' fill=\'%23fff\'/><path fill=\'%23ccc\' d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>');" onclick="document.getElementById('input-acc-avatar').click()" id="acc-avatar-preview">
+                    <input type="file" id="input-acc-avatar" accept="image/*" onchange="loadImage(event, 'acc-avatar-preview'); loadImage(event, 'main-avatar-preview');" style="display:none">
+                </div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.6);">点击更换头像</div>
+            </div>
+
+            <div class="settings-card">
+                <div class="form-group">
+                    <label>昵称</label>
+                    <input type="text" class="form-input" value="用户001" onchange="document.querySelector('.account-name').innerText = this.value">
+                </div>
+                <div class="form-group">
+                    <label>ID</label>
+                    <input type="text" class="form-input" value="10086" onchange="document.querySelector('.account-id').innerText = 'ID: ' + this.value">
+                </div>
+                <div class="form-group">
+                    <label>当前面具</label>
+                    <select class="form-select" id="account-mask-select" onchange="updateAccountMask()">
+                        <option value="">默认</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-list">
+                <div class="settings-item" onclick="openMaskList()"><span class="settings-item-title">面具管理板块</span><span class="settings-item-icon">›</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 面具列表页面 -->
+    <div id="mask-list-overlay" class="settings-overlay">
+        <div class="settings-header-top">
+            <div class="btn-glass" onclick="closeMaskList()" style="padding: 6px 14px;">返回</div>
+            <div class="settings-title">面具</div>
+            <div style="display:flex; gap:10px;">
+                <div class="btn-glass" onclick="toggleMaskManageMode()" id="btn-mask-manage">管理</div>
+                <div class="btn-glass" onclick="openMaskEdit()">+</div>
+            </div>
+        </div>
+        <div class="settings-content">
+            <div id="mask-manage-actions" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 14px; color: #fff;">可拖拽卡片调整位置</span>
+                <div class="btn-secondary" style="color: #ff4d4f; border-color: #ff4d4f; padding: 6px 10px;" onclick="deleteSelectedMasks()">删除选中</div>
+            </div>
+            <div class="polaroid-grid sortable-list" id="mask-grid">
+                <!-- 动态渲染面具 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 面具编辑页面 -->
+    <div id="mask-edit-overlay" class="settings-overlay" style="z-index: 160;">
+        <div class="settings-header-top">
+            <div class="btn-glass" onclick="closeMaskEdit()" style="padding: 6px 14px;">返回</div>
+            <div class="settings-title">编辑面具</div>
+            <div style="width: 58px;"></div> <!-- 占位平衡 -->
+        </div>
+        <div class="settings-content">
+            <input type="hidden" id="mask-edit-id">
+            <div class="settings-card" style="align-items: center; padding: 20px;">
+                <div class="account-avatar" style="width: 70px; height: 70px; margin-bottom: 5px; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><rect width=\'24\' height=\'24\' fill=\'%23fff\'/><path fill=\'%23ccc\' d=\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\'/></svg>');" onclick="document.getElementById('input-mask-avatar').click()" id="mask-avatar-preview">
+                    <input type="file" id="input-mask-avatar" accept="image/*" onchange="loadImageAndSaveDataUrl(event, 'mask-avatar-preview')" style="display:none">
+                </div>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.6);">点击更换头像</div>
+            </div>
+
+            <div class="settings-card">
+                <div class="form-group"><label>名字</label><input type="text" id="mask-input-name" class="form-input" placeholder="输入面具名字"></div>
+                <div class="form-group"><label>手机号</label><input type="text" id="mask-input-phone" class="form-input" placeholder="输入手机号"></div>
+                <div class="form-group">
+                    <label>性别</label>
+                    <select class="form-select" id="mask-input-gender" onchange="document.getElementById('gender-other').style.display = this.value === '其他' ? 'block' : 'none'">
+                        <option value="女">女</option>
+                        <option value="男">男</option>
+                        <option value="其他">其他</option>
+                    </select>
+                    <input type="text" class="form-input" id="gender-other" placeholder="请输入性别" style="display:none; margin-top:8px;">
+                </div>
+                <div class="form-group"><label>人设背景</label><textarea id="mask-input-bg" class="form-input" rows="3" placeholder="描述该面具的人设背景"></textarea></div>
+                
+                <div class="form-group" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                    <label style="margin:0;">语音配置 (仅针对User)</label>
+                    <label class="switch"><input type="checkbox" id="mask-input-voice-toggle" onchange="document.getElementById('mask-voice-config').style.display = this.checked ? 'flex' : 'none'"><span class="slider"></span></label>
+                </div>
+                <div class="form-group" id="mask-voice-config" style="display:none; padding:10px; background:rgba(255,255,255,0.05); border-radius:10px;">
+                    <label>语音识别/合成模型</label>
+                    <input type="text" id="mask-input-voice-model" class="form-input" placeholder="配置项...">
+                </div>
+
+                <div class="form-group">
+                    <label>选择字体</label>
+                    <select class="form-select" id="mask-input-font">
+                        <option value="">默认字体</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>字体导入与管理</label>
+                    <input type="file" id="input-mask-font" accept=".ttf,.otf,.woff" style="display:none" onchange="handleFontUpload(event)">
+                    <div class="btn-secondary" onclick="document.getElementById('input-mask-font').click()">+ 点击上传字体文件</div>
+                    <div id="font-manage-list" style="margin-top: 10px; max-height: 150px; overflow-y: auto;">
+                        <!-- 动态渲染导入的字体 -->
+                    </div>
+                    <div class="btn-secondary" style="margin-top: 5px; color: #ff4d4f; border-color: #ff4d4f;" onclick="deleteSelectedFonts()">删除选中字体</div>
+                </div>
+            </div>
+
+            <div class="form-row" style="margin-top:10px;">
+                <div class="btn-primary" style="flex:1" onclick="saveMaskData()">保存面具</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 照片放大预览浮层 -->
+    <div id="photo-preview-overlay" onclick="if(event.target === this) this.style.display='none'">
+        <div class="zoomed-polaroid-container" id="zoom-container">
+            <!-- 这里会动态注入翻转卡片 -->
+        </div>
+        <div class="zoom-controls">
+            <div class="zoom-btn" id="zoom-edit-btn" title="编辑">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </div>
+            <div class="zoom-btn" id="zoom-delete-btn" style="border-color: rgba(255,77,79,0.5);" title="删除">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" style="stroke: #ff4d4f;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗 -->
+    <div id="custom-confirm" class="modal-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index:400; display:none; justify-content:center; align-items:center;">
+        <div class="glass" style="padding:25px; border-radius:24px; width:75%; max-width:300px; display:flex; flex-direction:column; align-items:center; text-align:center; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+            <div id="confirm-msg" style="margin-bottom:20px; font-size:16px; font-weight:600; color:#fff;">确定执行此操作吗？</div>
+            <div style="display:flex; gap:15px; width:100%;">
+                <button id="confirm-cancel-btn" class="btn-secondary" style="flex:1;">取消</button>
+                <button id="confirm-ok-btn" class="btn-primary" style="flex:1; background: #ff4d4f; color: #fff;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-prompt" class="modal-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); z-index:200; display:none; justify-content:center; align-items:center;">
+        <div class="glass" style="padding:20px; border-radius:24px; width:80%; max-width:300px;">
+            <textarea id="prompt-input" rows="4" style="width:100%; background:rgba(0,0,0,0.3); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:12px; padding:10px; margin-bottom:15px;"></textarea>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closePrompt(false)" style="flex:1; padding:10px; border-radius:10px; border:none; background:rgba(255,255,255,0.1); color:#fff;">取消</button>
+                <button onclick="closePrompt(true)" style="flex:1; padding:10px; border-radius:10px; border:none; background:#fff; color:#000;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 桌面轮播点联动
+        const carousel = document.getElementById('desktop-carousel');
+        carousel.addEventListener('scroll', () => {
+            const index = Math.round(carousel.scrollLeft / window.innerWidth);
+            const dots = document.querySelectorAll('.page-dots .dot');
+            dots.forEach((d, i) => d.classList.toggle('active', i === index));
+        });
+
+        // ================= 编辑模式 (长按触发) =================
+        let pressTimer = null;
+        let isEditMode = false;
+
+        function startPress() {
+            if(isEditMode) return;
+            pressTimer = setTimeout(() => { toggleEditMode(true); }, 800);
+        }
+        function cancelPress() { clearTimeout(pressTimer); }
+        
+        document.getElementById('desktop-carousel').addEventListener('pointerdown', startPress);
+        document.getElementById('desktop-carousel').addEventListener('pointerup', cancelPress);
+        document.getElementById('desktop-carousel').addEventListener('pointermove', cancelPress);
+        
+        function toggleEditMode(enable) {
+            isEditMode = enable;
+            if(enable) {
+                document.body.classList.add('edit-mode');
+                if(window.navigator.vibrate) window.navigator.vibrate(50); // 震动反馈
+                // 开启所有区域的拖拽权限
+                sortableInstances.forEach(inst => inst.option("disabled", false));
+            } else {
+                document.body.classList.remove('edit-mode');
+                // 关闭拖拽权限锁定桌面
+                sortableInstances.forEach(inst => inst.option("disabled", true));
+                checkAndRemoveEmptyPages(); // 退出编辑时清理空页面
+            }
+        }
+
+        // ================= 丝滑跨界拖拽系统与文件夹合并 =================
+        let sortableInstances = [];
+        let hoveredAppToMerge = null;
+        let currentOpenFolder = null;
+        
+        function initSortableForList(list) {
+            const inst = new Sortable(list, {
+                group: "mixed", 
+                animation: 300,
+                easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+                disabled: !isEditMode,
+                ghostClass: 'dragging', 
+                delay: 150,
+                delayOnTouchOnly: true,
+                forceFallback: true,
+                fallbackOnBody: true,
+                scroll: document.getElementById('desktop-carousel'),
+                scrollSensitivity: 80,
+                scrollSpeed: 20,
+                bubbleScroll: true,
+                onStart: function() {
+                    // 如果在文件夹内拖拽，释放遮罩层使得能直接拖到下方桌面
+                    if (list.id === 'folder-grid') {
+                        document.getElementById('folder-overlay').style.pointerEvents = 'none';
+                        document.querySelector('.folder-view').style.pointerEvents = 'auto';
+                    }
+                },
+                onMove: function(evt, originalEvent) {
+                    const carousel = document.getElementById('desktop-carousel');
+                    const rect = carousel.getBoundingClientRect();
+                    if(originalEvent.clientX > rect.right - 35) {
+                        if(carousel.scrollLeft + carousel.clientWidth >= carousel.scrollWidth - 10) {
+                            createNewDesktopPage();
+                        }
+                    }
+
+                    // 文件夹合并判断逻辑
+                    const dragged = evt.dragged;
+                    const related = evt.related;
+                    
+                    // 只有 app-item 之间可以合并（排除大组件）
+                    if (dragged.classList.contains('app-item') && related && related.classList.contains('app-item') && !related.classList.contains('large-widget') && !related.classList.contains('music-widget')) {
+                        const targetRect = related.getBoundingClientRect();
+                        const x = originalEvent.clientX;
+                        const y = originalEvent.clientY;
+                        
+                        // 判定是否悬停在目标中心区域 (放宽判定范围使其更容易触发)
+                        if (x > targetRect.left + targetRect.width * 0.15 && x < targetRect.right - targetRect.width * 0.15 &&
+                            y > targetRect.top + targetRect.height * 0.15 && y < targetRect.bottom - targetRect.height * 0.15) {
+                            
+                            if (hoveredAppToMerge !== related) {
+                                if(hoveredAppToMerge) hoveredAppToMerge.classList.remove('merge-target');
+                                hoveredAppToMerge = related;
+                                related.classList.add('merge-target');
+                            }
+                            return false; // 拦截 Sortable 默认的替换排序行为
+                        }
+                    }
+                    if (hoveredAppToMerge && hoveredAppToMerge !== related) {
+                        hoveredAppToMerge.classList.remove('merge-target');
+                        hoveredAppToMerge = null;
+                    }
+                },
+                onEnd: function(evt) {
+                    if (list.id === 'folder-grid') {
+                        document.getElementById('folder-overlay').style.pointerEvents = 'auto';
+                        if (evt.to !== evt.from) closeFolder(); // 拖出文件夹则关闭它
+                    }
+                    
+                    if (hoveredAppToMerge) {
+                        hoveredAppToMerge.classList.remove('merge-target');
+                        mergeApps(evt.item, hoveredAppToMerge);
+                        hoveredAppToMerge = null;
+                    }
+                }
+            });
+            sortableInstances.push(inst);
+        }
+
+        function initAllSortables() {
+            sortableInstances.forEach(inst => inst.destroy());
+            sortableInstances = [];
+            // 将所有容器设为混合挂载点，支持跨界，包含隐藏的 folder-grid
+            document.querySelectorAll('.apps-full-grid, .desktop-page, .apps-grid, .dock-container, .folder-grid').forEach(list => {
+                if(!list.classList.contains('sortable-list')) list.classList.add('sortable-list');
+                initSortableForList(list);
+            });
+        }
+        
+        function createNewDesktopPage() {
+            const carousel = document.getElementById('desktop-carousel');
+            const newPage = document.createElement('div');
+            newPage.className = 'desktop-page sortable-list';
+            newPage.innerHTML = '<div class="apps-full-grid sortable-list" style="min-height: 80%;"></div>';
+            carousel.appendChild(newPage);
+            
+            initSortableForList(newPage);
+            initSortableForList(newPage.querySelector('.apps-full-grid'));
+            
+            updatePageDots();
+        }
+
+        function checkAndRemoveEmptyPages() {
+            const pages = document.querySelectorAll('.desktop-page');
+            if(pages.length <= 1) return;
+            pages.forEach((page, index) => {
+                if(index === 0) return; // 第一页强制保留
+                const hasApp = page.querySelector('.app-item, .large-widget, .music-widget');
+                if(!hasApp) page.remove();
+            });
+            updatePageDots();
+        }
+
+        function updatePageDots() {
+            const dotsContainer = document.getElementById('page-dots');
+            const pageCount = document.querySelectorAll('.desktop-page').length;
+            dotsContainer.innerHTML = '';
+            for(let i=0; i<pageCount; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'dot' + (i===0 ? ' active' : '');
+                dotsContainer.appendChild(dot);
+            }
+        }
+
+        // --- 文件夹管理系统函数 ---
+        function mergeApps(draggedEl, targetEl) {
+            // 如果目标已经是文件夹，直接丢进去
+            if (targetEl.classList.contains('folder-app')) {
+                const content = targetEl.querySelector('.folder-content');
+                content.appendChild(draggedEl);
+                updateFolderMiniGrid(targetEl);
+                return;
+            }
+
+            // 目标是普通App，生成新文件夹
+            const folder = document.createElement('div');
+            folder.className = 'app-item folder-app';
+            folder.draggable = true;
+            folder.onclick = function() { openFolder(this); };
+            
+            folder.innerHTML = `
+                <div class="delete-badge">-</div>
+                <div class="app-icon folder-icon">
+                    <div class="mini-grid"></div>
+                </div>
+                <span class="app-name">文件夹</span>
+                <div class="folder-content" style="display:none;"></div>
+            `;
+            
+            const content = folder.querySelector('.folder-content');
+            targetEl.parentNode.insertBefore(folder, targetEl);
+            content.appendChild(targetEl);
+            content.appendChild(draggedEl);
+            
+            updateFolderMiniGrid(folder);
+        }
+
+        function updateFolderMiniGrid(folder) {
+            const miniGrid = folder.querySelector('.mini-grid');
+            const apps = folder.querySelector('.folder-content').querySelectorAll('.app-item');
+            miniGrid.innerHTML = '';
+            
+            for(let i=0; i<Math.min(apps.length, 9); i++) {
+                const app = apps[i];
+                const iconSvg = app.querySelector('.app-icon svg');
+                const mini = document.createElement('div');
+                mini.className = 'mini-icon';
+                if (iconSvg) {
+                    mini.innerHTML = iconSvg.outerHTML;
+                } else {
+                    const imgDiv = app.querySelector('.app-icon div');
+                    if(imgDiv) mini.style.backgroundImage = imgDiv.style.backgroundImage;
+                }
+                miniGrid.appendChild(mini);
+            }
+        }
+
+        function openFolder(folderEl) {
+            // 如果在拖拽期间误触，阻止打开
+            if (document.body.classList.contains('sortable-fallback') || hoveredAppToMerge) return; 
+            
+            currentOpenFolder = folderEl;
+            const overlay = document.getElementById('folder-overlay');
+            const grid = document.getElementById('folder-grid');
+            const nameInput = overlay.querySelector('.folder-name-input');
+            
+            nameInput.value = folderEl.querySelector('.app-name').innerText;
+            grid.innerHTML = '';
+            
+            const apps = folderEl.querySelector('.folder-content').querySelectorAll('.app-item');
+            apps.forEach(app => grid.appendChild(app));
+            
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.classList.add('show'), 10);
+        }
+
+        function closeFolder() {
+            if (!currentOpenFolder) return;
+            const overlay = document.getElementById('folder-overlay');
+            const grid = document.getElementById('folder-grid');
+            const content = currentOpenFolder.querySelector('.folder-content');
+            
+            // 将面板里的 App 全部倒回当前文件夹隐藏空间
+            const apps = grid.querySelectorAll('.app-item');
+            apps.forEach(app => content.appendChild(app));
+            
+            currentOpenFolder.querySelector('.app-name').innerText = overlay.querySelector('.folder-name-input').value;
+            
+            // 自动销毁与解散逻辑
+            if (apps.length === 0) {
+                currentOpenFolder.remove();
+            } else if (apps.length === 1) {
+                currentOpenFolder.parentNode.insertBefore(apps[0], currentOpenFolder);
+                currentOpenFolder.remove();
+            } else {
+                updateFolderMiniGrid(currentOpenFolder);
+            }
+            
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.style.display = 'none', 300);
+            currentOpenFolder = null;
+        }
+
+        initAllSortables();
+
+        // ================= 设置界面 =================
+        function openSettings() {
+            if(isEditMode) return; // 编辑模式下不触发点击
+            document.getElementById('settings-overlay').classList.add('show');
+        }
+        function closeSettings() {
+            document.getElementById('settings-overlay').classList.remove('show');
+        }
+
+        function openApiSettings() {
+            document.getElementById('api-settings-overlay').classList.add('show');
+        }
+        function closeApiSettings() {
+            document.getElementById('api-settings-overlay').classList.remove('show');
+        }
+
+        // 面具及账号设置
+        function openAccountSettings() { 
+            renderAccountMaskOptions();
+            document.getElementById('account-settings-overlay').classList.add('show'); 
+        }
+        function closeAccountSettings() { document.getElementById('account-settings-overlay').classList.remove('show'); }
+
+        function renderAccountMaskOptions() {
+            const select = document.getElementById('account-mask-select');
+            if(!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">默认</option>';
+            masksData.forEach((m, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.innerText = m.name || '未命名';
+                select.appendChild(opt);
+            });
+            if(currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+                select.value = currentVal;
+            } else {
+                select.value = "";
+            }
+        }
+
+        function updateAccountMask() {
+            const select = document.getElementById('account-mask-select');
+            const text = select.options[select.selectedIndex].text;
+            document.querySelector('.account-mask').innerText = '选择的面具: ' + text;
+        }
+        
+        function openMaskList() { document.getElementById('mask-list-overlay').classList.add('show'); }
+        function closeMaskList() { document.getElementById('mask-list-overlay').classList.remove('show'); }
+
+        function openMaskEdit() { document.getElementById('mask-edit-overlay').classList.add('show'); }
+        function closeMaskEdit() { document.getElementById('mask-edit-overlay').classList.remove('show'); }
+
+        function toggleAccordion(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('expanded')) {
+                el.classList.remove('expanded');
+            } else {
+                // 如果需要互斥手风琴效果可以把同级其他移除，不过这里允许同时展开多个
+                el.classList.add('expanded');
+            }
+        }
+
+        const originalAppsData = new Map();
+        let currentBeautyIconDataUrl = null;
+
+        function openBeautySettings() {
+            // 动态获取当前桌面所有的App名称并填入下拉框
+            const select = document.getElementById('beauty-app-select');
+            if (select.options.length <= 1) {
+                document.querySelectorAll('.app-item').forEach(app => {
+                    const nameSpan = app.querySelector('.app-name');
+                    const originalName = app.dataset.originalName || nameSpan?.innerText || app.dataset.name;
+                    if(!originalName) return;
+                    
+                    if(!app.dataset.originalName) {
+                        app.dataset.originalName = originalName;
+                        const iconContainer = app.querySelector('.app-icon');
+                        originalAppsData.set(originalName, {
+                            iconHtml: iconContainer.innerHTML,
+                            name: originalName
+                        });
+                    }
+                    
+                    if(Array.from(select.options).some(opt => opt.value === originalName)) return;
+
+                    const opt = document.createElement('option');
+                    opt.value = originalName;
+                    opt.innerText = originalName;
+                    select.appendChild(opt);
+                });
+            }
+            resetBeautyForm();
+            document.getElementById('beauty-settings-overlay').classList.add('show');
+        }
+
+        function resetBeautyForm() {
+            document.getElementById('beauty-app-select').value = "";
+            document.getElementById('beauty-app-name').value = "";
+            document.getElementById('input-app-icon').value = "";
+            document.getElementById('btn-app-icon-upload').innerText = "选择新图标图片";
+            document.getElementById('beauty-icon-preview').style.display = "none";
+            document.getElementById('beauty-icon-preview').style.backgroundImage = "";
+            currentBeautyIconDataUrl = null;
+        }
+
+        function previewAppIcon(e) {
+            if(e.target.files[0]) {
+                const r = new FileReader();
+                r.onload = ev => { 
+                    currentBeautyIconDataUrl = ev.target.result;
+                    document.getElementById('beauty-icon-preview').style.display = "block";
+                    document.getElementById('beauty-icon-preview').style.backgroundImage = `url(${ev.target.result})`;
+                    document.getElementById('btn-app-icon-upload').innerText = "已选择图片 (点击更换)";
+                };
+                r.readAsDataURL(e.target.files[0]);
+            }
+        }
+
+        function saveAppBeauty() {
+            const targetOriginalName = document.getElementById('beauty-app-select').value;
+            if(!targetOriginalName) return alert('请先选择要修改的 App');
+
+            const newName = document.getElementById('beauty-app-name').value.trim();
+            
+            document.querySelectorAll('.app-item').forEach(app => {
+                if(app.dataset.originalName === targetOriginalName) {
+                    if(newName) {
+                        const nameSpan = app.querySelector('.app-name');
+                        if(nameSpan) nameSpan.innerText = newName;
+                        if(app.dataset.name) app.dataset.name = newName;
+                    }
+                    if(currentBeautyIconDataUrl) {
+                        const iconContainer = app.querySelector('.app-icon');
+                        if(iconContainer) {
+                            iconContainer.innerHTML = `<div style="width:100%; height:100%; border-radius:17px; background-image:url(${currentBeautyIconDataUrl}); background-size:cover; background-position:center;"></div>`;
+                        }
+                    }
+                }
+            });
+            alert('App信息修改成功！');
+            resetBeautyForm();
+        }
+
+        function restoreAppBeauty() {
+            const targetOriginalName = document.getElementById('beauty-app-select').value;
+            if(!targetOriginalName) return alert('请先选择要恢复的 App');
+
+            const originalData = originalAppsData.get(targetOriginalName);
+            if(originalData) {
+                document.querySelectorAll('.app-item').forEach(app => {
+                    if(app.dataset.originalName === targetOriginalName) {
+                        const nameSpan = app.querySelector('.app-name');
+                        if(nameSpan) nameSpan.innerText = originalData.name;
+                        if(app.dataset.name) app.dataset.name = originalData.name;
+                        
+                        const iconContainer = app.querySelector('.app-icon');
+                        if(iconContainer) iconContainer.innerHTML = originalData.iconHtml;
+                    }
+                });
+                alert('已恢复该App的默认图标和名称');
+                resetBeautyForm();
+            }
+        }
+
+        function restoreAllAppBeauty() {
+            document.querySelectorAll('.app-item').forEach(app => {
+                const targetOriginalName = app.dataset.originalName;
+                if(targetOriginalName) {
+                    const originalData = originalAppsData.get(targetOriginalName);
+                    if(originalData) {
+                        const nameSpan = app.querySelector('.app-name');
+                        if(nameSpan) nameSpan.innerText = originalData.name;
+                        if(app.dataset.name) app.dataset.name = originalData.name;
+                        
+                        const iconContainer = app.querySelector('.app-icon');
+                        if(iconContainer) iconContainer.innerHTML = originalData.iconHtml;
+                    }
+                }
+            });
+            alert('所有App已恢复默认设置！');
+            resetBeautyForm();
+        }
+
+        function closeBeautySettings() {
+            document.getElementById('beauty-settings-overlay').classList.remove('show');
+        }
+
+        // ================= 数据导入/导出 =================
+        function exportData(type) {
+            // 此处收集系统数据，后续可以扩展把组件文本、图标、布局顺序也打包进来
+            const data = {
+                type: type,
+                timestamp: new Date().toISOString(),
+                beauty: {
+                    wallpaper: document.getElementById('os-container').style.background
+                },
+                appData: type === 'archive' ? {
+                    message: "包含聊天、联系人等一切系统及App内数据"
+                } : undefined
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `aituos_${type}_${Date.now()}.json`);
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importData(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    console.log("导入数据成功:", data);
+                    alert(`${type === 'archive' ? '档案数据' : '美化数据'}导入成功！`);
+                    
+                    // 若有壁纸数据则进行简单恢复演示
+                    if(data.beauty && data.beauty.wallpaper) {
+                        document.getElementById('os-container').style.background = data.beauty.wallpaper;
+                    }
+                } catch(err) {
+                    alert('导入失败，文件格式错误或已损坏');
+                }
+                event.target.value = ""; // 清空 input 以便下次重复导入相同文件
+            };
+            reader.readAsText(file);
+        }
+
+        function changeWallpaper(e) {
+            if(e.target.files[0]) {
+                const r = new FileReader();
+                r.onload = ev => { 
+                    document.getElementById('os-container').style.background = `url(${ev.target.result}) center/cover no-repeat`;
+                };
+                r.readAsDataURL(e.target.files[0]);
+            }
+        }
+        function restoreWallpaper() {
+            document.getElementById('os-container').style.background = 'linear-gradient(135deg, #2a2d34 0%, #4a5058 40%, #1a1c21 100%)';
+        }
+
+        // ================= 全局搜索 =================
+        let appsCloned = false;
+        function openSearch() {
+            const overlay = document.getElementById('search-overlay');
+            const container = document.getElementById('search-results-container');
+            overlay.classList.add('show');
+            
+            if (!appsCloned) {
+                document.querySelectorAll('.app-item').forEach(app => {
+                    const clone = app.cloneNode(true);
+                    clone.draggable = false;
+                    clone.querySelector('.delete-badge')?.remove(); // 移除徽章
+                    
+                    // 显示可能隐藏的 dock 名字
+                    const nameSpan = clone.querySelector('.app-name');
+                    if(nameSpan) nameSpan.style.display = 'block';
+                    if(clone.dataset.name && !nameSpan) {
+                        const span = document.createElement('span');
+                        span.className = 'app-name';
+                        span.innerText = clone.dataset.name;
+                        clone.appendChild(span);
+                    }
+                    container.insertBefore(clone, document.getElementById('no-search-result'));
+                });
+                appsCloned = true;
+            }
+            filterApps();
+        }
+        function closeSearch() { document.getElementById('search-overlay').classList.remove('show'); }
+        function filterApps() {
+            const query = document.getElementById('app-search-input').value.toLowerCase();
+            let hasVisible = false;
+            document.querySelectorAll('#search-results-container .app-item').forEach(app => {
+                const name = (app.querySelector('.app-name')?.innerText || app.dataset.name || '').toLowerCase();
+                if (name.includes(query)) { app.style.display = 'flex'; hasVisible = true; } 
+                else { app.style.display = 'none'; }
+            });
+            document.getElementById('no-search-result').style.display = hasVisible ? 'none' : 'block';
+        }
+
+        // ================= 图片/文字修改 =================
+        function triggerUpload(id) { if(!isEditMode) document.getElementById(id).click(); }
+        function loadImage(e, id) {
+            if(e.target.files[0]) {
+                const r = new FileReader();
+                r.onload = ev => { document.getElementById(id).style.backgroundImage = `url(${ev.target.result})`; };
+                r.readAsDataURL(e.target.files[0]);
+            }
+        }
+        
+        let currentEditEl = null;
+        function editString(id) {
+            if(!isEditMode) {
+                currentEditEl = id;
+                document.getElementById('prompt-input').value = document.getElementById(id).innerHTML.replace(/<br>/g, '\n');
+                document.getElementById('custom-prompt').style.display = 'flex';
+            }
+        }
+        function closePrompt(save) {
+            if(save && currentEditEl) document.getElementById(currentEditEl).innerHTML = document.getElementById('prompt-input').value.replace(/\n/g, '<br>');
+            document.getElementById('custom-prompt').style.display = 'none';
+        }
+
+        function showConfirm(msg, onConfirm) {
+            const modal = document.getElementById('custom-confirm');
+            document.getElementById('confirm-msg').innerText = msg;
+            
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            const okBtn = document.getElementById('confirm-ok-btn');
+            
+            const newCancel = cancelBtn.cloneNode(true);
+            const newOk = okBtn.cloneNode(true);
+            cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+            okBtn.parentNode.replaceChild(newOk, okBtn);
+            
+            newCancel.onclick = () => { modal.style.display = 'none'; };
+            newOk.onclick = () => { modal.style.display = 'none'; onConfirm(); };
+            
+            modal.style.display = 'flex';
+        }
+
+        // ================= 面具和字体系统 =================
+        let masksData = [];
+        let fontsData = [];
+        let isMaskManageMode = false;
+        let maskAvatarDataUrl = '';
+        let maskSortable = null;
+
+        function initMaskSystem() {
+            if(!maskSortable) {
+                maskSortable = new Sortable(document.getElementById('mask-grid'), {
+                    animation: 150,
+                    disabled: true,
+                    delay: 150,
+                    delayOnTouchOnly: true,
+                    forceFallback: true,
+                    fallbackOnBody: true,
+                    onEnd: function (evt) {
+                        const movedItem = masksData.splice(evt.oldIndex, 1)[0];
+                        masksData.splice(evt.newIndex, 0, movedItem);
+                        renderMaskList();
+                    }
+                });
+            }
+        }
+
+        function loadImageAndSaveDataUrl(e, previewId) {
+            if(e.target.files[0]) {
+                const r = new FileReader();
+                r.onload = ev => { 
+                    maskAvatarDataUrl = ev.target.result;
+                    document.getElementById(previewId).style.backgroundImage = `url(${ev.target.result})`; 
+                };
+                r.readAsDataURL(e.target.files[0]);
+            }
+        }
+
+        function renderMaskList() {
+            const grid = document.getElementById('mask-grid');
+            grid.innerHTML = '';
+            
+            // 每次重新渲染列表时，同步更新个人账号界面的下拉框，防止删除面具后菜单里还有遗留
+            renderAccountMaskOptions();
+            updateAccountMask();
+
+            masksData.forEach((m, index) => {
+                const fontName = m.font ? fontsData.find(f => f.id === m.font)?.fontFamily || '' : '';
+                const styleStr = fontName ? `font-family: '${fontName}';` : '';
+                
+                const card = document.createElement('div');
+                card.className = 'polaroid-card';
+                card.innerHTML = `
+                    <input type="checkbox" class="mask-checkbox" data-index="${index}">
+                    <div class="polaroid-inner">
+                        <div class="polaroid-front" onclick="flipCard(this)">
+                            <div class="polaroid-img" style="background-image: url('${m.avatar || ''}'); background-color: #ccc;"></div>
+                            <div class="polaroid-name" style="${styleStr}">${m.name || '未命名'}</div>
+                        </div>
+                        <div class="polaroid-back" onclick="flipCard(this)">
+                            <div class="polaroid-back-name" style="${styleStr}">${m.name || '未命名'}</div>
+                            <div class="polaroid-back-phone">${m.phone || '无手机号'}</div>
+                            <div class="polaroid-actions" onclick="event.stopPropagation()">
+                                <div class="polaroid-icon-btn" onclick="openZoomedMask(${index})">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function flipCard(el) {
+            if(isMaskManageMode) return;
+            const card = el.closest('.polaroid-card, .zoomed-polaroid-container');
+            // 注意：针对不同的DOM结构，这里的翻转逻辑稍作兼容
+            if(card.classList.contains('zoomed-polaroid-container')) {
+                 const inner = card.querySelector('.polaroid-inner');
+                 card.classList.toggle('flipped');
+            } else {
+                 card.classList.toggle('flipped');
+            }
+        }
+
+        function openZoomedMask(index) {
+            const m = masksData[index];
+            const fontName = m.font ? fontsData.find(f => f.id === m.font)?.fontFamily || '' : '';
+            const styleStr = fontName ? `font-family: '${fontName}';` : '';
+            
+            const container = document.getElementById('zoom-container');
+            container.classList.add('flipped'); // 放大后默认先显示背面
+            container.innerHTML = `
+                <div class="polaroid-inner" style="width:100%; height:100%;">
+                    <div class="polaroid-front" onclick="flipCard(this.parentElement.parentElement)">
+                        <div class="polaroid-img" style="background-image: url('${m.avatar || ''}'); background-color: #ccc;"></div>
+                        <div class="polaroid-name" style="${styleStr} font-size: 18px;">${m.name || '未命名'}</div>
+                    </div>
+                    <div class="polaroid-back" onclick="flipCard(this.parentElement.parentElement)">
+                        <div class="polaroid-back-name" style="${styleStr} font-size: 24px;">${m.name || '未命名'}</div>
+                        <div class="polaroid-back-phone" style="font-size: 16px;">${m.phone || '无手机号'}</div>
+                    </div>
+                </div>
+            `;
+            
+            // 绑定外部按钮事件
+            document.getElementById('zoom-edit-btn').onclick = () => {
+                document.getElementById('photo-preview-overlay').style.display = 'none';
+                editMask(index);
+            };
+            document.getElementById('zoom-delete-btn').onclick = () => {
+                showConfirm('确定删除该面具？', () => {
+                    masksData.splice(index, 1);
+                    document.getElementById('photo-preview-overlay').style.display = 'none';
+                    renderMaskList();
+                });
+            };
+            
+            document.getElementById('photo-preview-overlay').style.display = 'flex';
+        }
+
+        function toggleMaskManageMode() {
+            isMaskManageMode = !isMaskManageMode;
+            const overlay = document.getElementById('mask-list-overlay');
+            const btn = document.getElementById('btn-mask-manage');
+            const actions = document.getElementById('mask-manage-actions');
+            
+            if(isMaskManageMode) {
+                overlay.classList.add('manage-mode');
+                btn.innerText = '完成';
+                actions.style.display = 'flex';
+                maskSortable.option("disabled", false);
+            } else {
+                overlay.classList.remove('manage-mode');
+                btn.innerText = '管理';
+                actions.style.display = 'none';
+                maskSortable.option("disabled", true);
+            }
+        }
+
+        function deleteSelectedMasks() {
+            const checkboxes = document.querySelectorAll('.mask-checkbox:checked');
+            if(checkboxes.length === 0) return alert('请先选择要删除的面具');
+            showConfirm('确定要删除选中的面具吗？', () => {
+                const indices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.index)).sort((a,b)=>b-a);
+                indices.forEach(idx => masksData.splice(idx, 1));
+                renderMaskList();
+            });
+        }
+
+        function deleteMask(index) {
+            showConfirm('确定删除该面具？', () => {
+                masksData.splice(index, 1);
+                renderMaskList();
+            });
+        }
+
+        function editMask(index) {
+            const m = masksData[index];
+            document.getElementById('mask-edit-id').value = index;
+            document.getElementById('mask-input-name').value = m.name || '';
+            document.getElementById('mask-input-phone').value = m.phone || '';
+            document.getElementById('mask-input-gender').value = m.gender || '女';
+            document.getElementById('gender-other').style.display = m.gender === '其他' ? 'block' : 'none';
+            document.getElementById('gender-other').value = (m.gender === '其他' && m.genderCustom) ? m.genderCustom : '';
+            document.getElementById('mask-input-bg').value = m.bg || '';
+            
+            document.getElementById('mask-input-voice-toggle').checked = m.voiceEnabled || false;
+            document.getElementById('mask-voice-config').style.display = m.voiceEnabled ? 'flex' : 'none';
+            document.getElementById('mask-input-voice-model').value = m.voiceModel || '';
+            document.getElementById('mask-input-font').value = m.font || '';
+            
+            maskAvatarDataUrl = m.avatar || '';
+            const defaultAvatar = "url('data:image/svg+xml;utf8,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' viewBox=\\\'0 0 24 24\\\'><rect width=\\\'24\\\' height=\\\'24\\\' fill=\\\'%23fff\\\'/><path fill=\\\'%23ccc\\\' d=\\\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\\\'/></svg>')";
+            document.getElementById('mask-avatar-preview').style.backgroundImage = maskAvatarDataUrl ? `url(${maskAvatarDataUrl})` : defaultAvatar;
+            
+            openMaskEdit(true);
+        }
+
+        function openMaskEdit(isEdit = false) {
+            if(isEdit !== true) {
+                document.getElementById('mask-edit-id').value = '';
+                document.getElementById('mask-input-name').value = '';
+                document.getElementById('mask-input-phone').value = '';
+                document.getElementById('mask-input-gender').value = '女';
+                document.getElementById('gender-other').style.display = 'none';
+                document.getElementById('gender-other').value = '';
+                document.getElementById('mask-input-bg').value = '';
+                document.getElementById('mask-input-voice-toggle').checked = false;
+                document.getElementById('mask-voice-config').style.display = 'none';
+                document.getElementById('mask-input-voice-model').value = '';
+                document.getElementById('mask-input-font').value = '';
+                maskAvatarDataUrl = '';
+                document.getElementById('mask-avatar-preview').style.backgroundImage = "url('data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\'><rect width=\\'24\\' height=\\'24\\' fill=\\'%23fff\\'/><path fill=\\'%23ccc\\' d=\\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\\'/></svg>')";
+            }
+            renderFontOptions();
+            renderFontManageList();
+            document.getElementById('mask-edit-overlay').classList.add('show');
+        }
+
+        function saveMaskData() {
+            const index = document.getElementById('mask-edit-id').value;
+            const genderVal = document.getElementById('mask-input-gender').value;
+            const data = {
+                name: document.getElementById('mask-input-name').value,
+                phone: document.getElementById('mask-input-phone').value,
+                gender: genderVal,
+                genderCustom: genderVal === '其他' ? document.getElementById('gender-other').value : '',
+                bg: document.getElementById('mask-input-bg').value,
+                voiceEnabled: document.getElementById('mask-input-voice-toggle').checked,
+                voiceModel: document.getElementById('mask-input-voice-model').value,
+                font: document.getElementById('mask-input-font').value,
+                avatar: maskAvatarDataUrl
+            };
+            
+            if(index !== '') {
+                masksData[index] = data;
+            } else {
+                masksData.push(data);
+            }
+            renderMaskList();
+            closeMaskEdit();
+        }
+
+        function handleFontUpload(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const fileName = file.name.split('.')[0];
+            const url = URL.createObjectURL(file);
+            const fontId = 'font_' + Date.now();
+            const fontFamily = `CustomFont_${fontId}`;
+
+            const newFont = new FontFace(fontFamily, `url(${url})`);
+            newFont.load().then(loadedFace => {
+                document.fonts.add(loadedFace);
+                fontsData.push({ id: fontId, name: fileName, url: url, fontFamily: fontFamily });
+                renderFontOptions();
+                renderFontManageList();
+                document.getElementById('mask-input-font').value = fontId;
+            }).catch(e => alert('字体加载失败: ' + e));
+            event.target.value = '';
+        }
+
+        function renderFontOptions() {
+            const select = document.getElementById('mask-input-font');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">默认字体</option>';
+            fontsData.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                opt.innerText = f.name;
+                select.appendChild(opt);
+            });
+            if(fontsData.some(f => f.id === currentVal)) select.value = currentVal;
+        }
+
+        function renderFontManageList() {
+            const list = document.getElementById('font-manage-list');
+            list.innerHTML = '';
+            fontsData.forEach(f => {
+                const div = document.createElement('div');
+                div.className = 'font-list-item';
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                        <input type="checkbox" class="font-checkbox" value="${f.id}">
+                        <input type="text" value="${f.name}" onchange="updateFontName('${f.id}', this.value)" style="background:transparent; border:none; color:#fff; border-bottom:1px solid rgba(255,255,255,0.3); width:100px; font-family:'${f.fontFamily}';">
+                    </div>
+                    <span style="font-family:'${f.fontFamily}';">预览 Abc</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function updateFontName(id, newName) {
+            const font = fontsData.find(f => f.id === id);
+            if(font) { font.name = newName; renderFontOptions(); }
+        }
+
+        function deleteSelectedFonts() {
+            const checkboxes = document.querySelectorAll('.font-checkbox:checked');
+            if(checkboxes.length === 0) return alert('请先选择要删除的字体');
+            const idsToDelete = Array.from(checkboxes).map(cb => cb.value);
+            fontsData = fontsData.filter(f => !idsToDelete.includes(f.id));
+            
+            const select = document.getElementById('mask-input-font');
+            if(idsToDelete.includes(select.value)) select.value = '';
+            
+            renderFontOptions();
+            renderFontManageList();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initMaskSystem();
+            renderMaskList();
+        });
+    </script>
+</body>
+</html>
